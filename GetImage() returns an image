@@ -1,0 +1,15 @@
+GetImage() returns an image
+
+Dataclass -- struct to store our data (image + tarnsformation + rotation)
+
+GetGroundTruth(string imageName) -- returns transformation (3x1) rotation (3x3)
+    
+ConvertQuaternionToMatrix() -- 3x3 matrix
+
+GetTimeStamp(string imageName) -- given an image it returns the timestamp
+
+
+-------
+
+CleanupData()
+- go throuhg the groundtruths, and remove any timestampls that are not seen in the rgb poses) 
