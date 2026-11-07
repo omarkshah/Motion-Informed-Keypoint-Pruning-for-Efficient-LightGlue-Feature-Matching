@@ -16,7 +16,13 @@ class Frame:
 def quaternion_to_matrix(qx, qy, qz, qw) -> np.ndarray:
     """TUM order is (qx, qy, qz, qw). Returns a 3x3 rotation matrix."""
     q = np.array([qx, qy, qz, qw], dtype=np.float64)
-    q /= np.linalg.norm(q)
+
+    norm = np.linalg.norm(q)
+
+    if norm < 1e-12:
+        raise ValueError("Invalid zero-length quaternion")
+
+    q /= norm
     x, y, z, w = q
     return np.array([
         [1 - 2*(y*y + z*z), 2*(x*y - z*w),     2*(x*z + y*w)],
@@ -53,19 +59,33 @@ class TumSequence:
         gt = np.array(_read_tum_file(self.root / "groundtruth.txt"), dtype=np.float64)
         self.gt = gt[np.argsort(gt[:, 0])]
 
+        # assumes sorted data
         self.frames = self.cleanup_data()
 
     # ---------- lookups ----------
     def _resolve(self, image_name):
         if image_name in self.rgb:
             return image_name
-        return self._basename[Path(image_name).name]
+        basename = Path(image_name).name
+
+        if basename not in self._basename:
+            raise FileNotFoundError(f"RGB image not found: {image_name}")
+
+        return self._basename[basename]
 
     def get_timestamp(self, image_name) -> float:
         return self.rgb[self._resolve(image_name)]
 
     def get_image(self, image_name, flags=cv2.IMREAD_COLOR):
-        return cv2.imread(str(self.root / self._resolve(image_name)), flags)
+        # openCV loads colour images in BGR order not RGB
+
+        path = self.root / self._resolve(image_name)
+        image = cv2.imread(str(path), flags)
+
+        if image is None:
+            raise FileNotFoundError(f"Could not load image: {path}")
+
+        return image
 
     # ---------- ground truth ----------
     def _pose_at(self, ts):
