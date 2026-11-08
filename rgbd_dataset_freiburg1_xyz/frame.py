@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 import cv2
 
+from tum_associate import read_file_list, associate
+
 
 @dataclass
 class Frame:
@@ -31,55 +33,40 @@ def quaternion_to_matrix(qx, qy, qz, qw) -> np.ndarray:
     ])
 
 
-def _read_tum_file(path):
-    """Skip '#' comment lines, return list of token lists."""
-    rows = []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                rows.append(line.split())
-    return rows
-
-
 class TumSequence:
-    def __init__(self, root, max_diff=0.02, interpolate=True):
+    def __init__(self, root, max_diff=0.02):
         self.root = Path(root)
         self.max_diff = max_diff
-        self.interpolate = interpolate
 
-        # rgb.txt: "timestamp filename"
-        self.rgb = {}   # name -> timestamp
-        for ts, name in _read_tum_file(self.root / "rgb.txt"):
-            self.rgb[name] = float(ts)
-        # also allow lookup by bare filename
-        self._basename = {Path(n).name: n for n in self.rgb}
+        # rgb.txt: "timestamp filename"              -> {ts: [filename]}
+        # groundtruth.txt: "ts tx ty tz qx qy qz qw" -> {ts: [tx, ty, tz, qx, qy, qz, qw]}
+        self._rgb_list = read_file_list(self.root / "rgb.txt")
+        self._gt_list = read_file_list(self.root / "groundtruth.txt")
 
-        # groundtruth.txt: "ts tx ty tz qx qy qz qw"
-        gt = np.array(_read_tum_file(self.root / "groundtruth.txt"), dtype=np.float64)
-        self.gt = gt[np.argsort(gt[:, 0])]
+        self.frames = self.load_data()
 
-        # assumes sorted data
-        self.frames = self.cleanup_data()
+        # lookup by full relative name ("rgb/123.png") or bare filename ("123.png")
+        self._by_name = {}
+        for f in self.frames:
+            self._by_name[f.name] = f
+            self._by_name[Path(f.name).name] = f
 
-    # ---------- lookups ----------
-    def _resolve(self, image_name):
-        if image_name in self.rgb:
-            return image_name
-        basename = Path(image_name).name
+    def _get(self, image_name) -> Frame:
+        frame = self._by_name.get(image_name) or self._by_name.get(Path(image_name).name)
 
-        if basename not in self._basename:
-            raise FileNotFoundError(f"RGB image not found: {image_name}")
+        if frame is None:
+            raise FileNotFoundError(
+                f"RGB image not found (or dropped for having no groundtruth): {image_name}"
+            )
 
-        return self._basename[basename]
+        return frame
 
     def get_timestamp(self, image_name) -> float:
-        return self.rgb[self._resolve(image_name)]
+        return self._get(image_name).timestamp
 
     def get_image(self, image_name, flags=cv2.IMREAD_COLOR):
         # openCV loads colour images in BGR order not RGB
-
-        path = self.root / self._resolve(image_name)
+        path = self._get(image_name).image_path
         image = cv2.imread(str(path), flags)
 
         if image is None:
@@ -87,54 +74,46 @@ class TumSequence:
 
         return image
 
-    # ---------- ground truth ----------
-    def _pose_at(self, ts):
-        """Return (t, R) at time ts, or None if no groundtruth within max_diff."""
-        times = self.gt[:, 0]
-        i = np.searchsorted(times, ts)          # first index with times[i] >= ts
-        lo, hi = max(i - 1, 0), min(i, len(times) - 1)
-
-        # nearest neighbour check against tolerance
-        nearest = lo if abs(times[lo] - ts) <= abs(times[hi] - ts) else hi
-        if abs(times[nearest] - ts) > self.max_diff:
-            return None
-
-        # no interpolation possible at the edges, or if disabled
-        if not self.interpolate or lo == hi or not (times[lo] <= ts <= times[hi]):
-            r = self.gt[nearest]
-            return r[1:4].copy(), quaternion_to_matrix(*r[4:8])
-
-        # linear interpolation between the two bracketing poses
-        a, b = self.gt[lo], self.gt[hi]
-        alpha = (ts - a[0]) / (b[0] - a[0])
-        t = (1 - alpha) * a[1:4] + alpha * b[1:4]
-        qa, qb = a[4:8], b[4:8]
-        if np.dot(qa, qb) < 0:                  # q and -q are the same rotation
-            qb = -qb
-        q = (1 - alpha) * qa + alpha * qb       # nlerp; fine for ~10 ms gaps
-        return t, quaternion_to_matrix(*q)
-
     def get_ground_truth(self, image_name):
-        """Returns (translation (3,), rotation (3,3)), or None if unmatched."""
-        return self._pose_at(self.get_timestamp(image_name))
+        """Returns (translation (3,), rotation (3,3))."""
+        frame = self._get(image_name)
+        return frame.t, frame.R
 
     # ---------- cleanup ----------
-    def cleanup_data(self):
+    def load_data(self):
         """Keep only RGB frames that have a groundtruth pose within max_diff."""
-        frames, dropped = [], 0
-        for name, ts in sorted(self.rgb.items(), key=lambda kv: kv[1]):
-            pose = self._pose_at(ts)
-            if pose is None:
-                dropped += 1
-                continue
-            t, R = pose
-            frames.append(Frame(name, ts, self.root / name, t, R))
+        # one-to-one matches: [(rgb_ts, gt_ts), ...], sorted by rgb_ts
+        matches = associate(self._rgb_list, self._gt_list, 0.0, self.max_diff)
+
+        frames = []
+        for rgb_ts, gt_ts in matches:
+            name = self._rgb_list[rgb_ts][0]
+            tx, ty, tz, qx, qy, qz, qw = map(float, self._gt_list[gt_ts])
+
+            frames.append(Frame(
+                name=name,
+                timestamp=rgb_ts,
+                image_path=self.root / name,
+                t=np.array([tx, ty, tz], dtype=np.float64),
+                R=quaternion_to_matrix(qx, qy, qz, qw),
+            ))
+
+        dropped = len(self._rgb_list) - len(frames)
         print(f"Kept {len(frames)} frames, dropped {dropped} (no GT within {self.max_diff}s)")
         return frames
 
 
 def relative_pose(f1: Frame, f2: Frame):
     """Pose of camera 2 expressed in camera 1's frame (what the pruner needs)."""
-    R_rel = f1.R.T @ f2.R
-    t_rel = f1.R.T @ (f2.t - f1.t)
-    return R_rel, t_rel
+    # t - position of camera in world frame, R - rotation of camera in world frame
+    cam2_orientation_rel_cam1 = f1.R.T @ f2.R
+    cam2_position_rel_cam1 = f1.R.T @ (f2.t - f1.t)
+    return cam2_orientation_rel_cam1, cam2_position_rel_cam1
+
+def transform_1_to_2(f1: Frame, f2: Frame):
+    """Transform 3D points from camera 1 coordinates to camera 2 coordinates."""
+
+    cam1_orientation_rel_cam2 = f2.R.T @ f1.R
+    cam1_position_rel_cam2 = f2.R.T @ (f1.t - f2.t)
+
+    return cam1_orientation_rel_cam2, cam1_position_rel_cam2
