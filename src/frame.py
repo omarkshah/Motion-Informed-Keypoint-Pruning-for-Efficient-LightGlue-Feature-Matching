@@ -16,6 +16,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from tum_associate import read_file_list, associate
+
 
 @dataclass
 class Image:
@@ -51,17 +53,19 @@ class ImageSequence:
         root: dataset directory containing rgb.txt and groundtruth.txt.
         max_dt: max time gap (s) between an RGB frame and a ground-truth sample;
             frames with no ground truth this close are dropped.
-        interpolate: linearly interpolate the pose between the two bracketing
-            ground-truth samples instead of taking the nearest one.
     """
 
-    def __init__(self, root: str | Path, max_dt: float = 0.02, interpolate: bool = True):
+    def __init__(self, root: str | Path, max_dt: float = 0.02):
         self.root = Path(root)
-        self.max_dt = max_dt
-        self.interpolate = interpolate
 
-        self._groundtruth = _load_groundtruth(self.root / "groundtruth.txt")
-        self.images: list[Image] = self._build_images(_load_rgb_index(self.root / "rgb.txt"))
+        if max_dt <= 0:
+            raise ValueError("max_dt must be positive")
+        self.max_dt = max_dt
+
+        self._rgb_list = read_file_list(self.root / "rgb.txt")
+        self._gt_list = read_file_list(self.root / "groundtruth.txt")
+
+        self.images: list[Image] = self._build_images()
 
     def __len__(self) -> int:
         return len(self.images)
@@ -69,47 +73,45 @@ class ImageSequence:
     def __iter__(self):
         return iter(self.images)
 
-    def _build_images(self, rgb_index: list[tuple[float, str]]) -> list[Image]:
+    def _build_images(self) -> list[Image]:
+        # associate rgb frames with ground truth poses, dropping frames with no close ground truth
+        matches = associate(self._rgb_list, self._gt_list, 0.0, self.max_dt)
+
         images = []
-    
-        for timestamp, name in rgb_index:
+        time_diffs = [] # TODO: for testing
 
-            pose = self.pose_at(timestamp)
-            if pose is not None:
-                R, t = pose
-                images.append(Image(name, timestamp, self.root / name, R, t))
+        for rgb_ts, gt_ts in matches:
+            time_diffs.append(abs(rgb_ts - gt_ts)) # for testing
 
+            name = self._rgb_list[rgb_ts][0]
+            tx, ty, tz, qx, qy, qz, qw = map(float, self._gt_list[gt_ts])
+
+            images.append(Image(
+                name=name,
+                timestamp=rgb_ts,
+                path=self.root / name,
+                R=quaternion_to_matrix(np.array([qx, qy, qz, qw])),
+                t=np.array([tx, ty, tz], dtype=np.float64),
+            ))
+
+        dropped = len(self._rgb_list) - len(images)
+        print(f"Kept {len(images)} frames, dropped {dropped} (no GT within {self.max_dt}s)")
+
+        if time_diffs:
+            print(f"Maximum timestamp difference: {max(time_diffs) * 1000:.2f} ms")
+            print(f"Average timestamp difference: {np.mean(time_diffs) * 1000:.2f} ms")
+        
         return images
 
-    def pose_at(self, timestamp: float) -> tuple[np.ndarray, np.ndarray] | None:
-        """(R, t) at `timestamp`, or None if no ground truth within max_dt."""
-        gt = self._groundtruth
-        times = gt[:, 0]
-
-        i = np.searchsorted(times, timestamp)   # first index with times[i] >= timestamp
-        lo, hi = max(i - 1, 0), min(i, len(times) - 1)
-        nearest = lo if abs(times[lo] - timestamp) <= abs(times[hi] - timestamp) else hi
-        if abs(times[nearest] - timestamp) > self.max_dt:
-            return None
-
-        bracketed = lo != hi and times[lo] <= timestamp <= times[hi]
-        if not (self.interpolate and bracketed):
-            row = gt[nearest]
-            return quaternion_to_matrix(row[4:8]), row[1:4].copy()
-
-        a, b = gt[lo], gt[hi]
-        alpha = (timestamp - a[0]) / (b[0] - a[0])
-        t = (1 - alpha) * a[1:4] + alpha * b[1:4]
-        qa, qb = a[4:8], b[4:8]
-        if np.dot(qa, qb) < 0:          # q and -q are the same rotation; take the short way
-            qb = -qb
-        q = (1 - alpha) * qa + alpha * qb   # nlerp: fine for ~10 ms gaps
-        return quaternion_to_matrix(q), t
-
-
 def quaternion_to_matrix(q: np.ndarray) -> np.ndarray:
+    q = np.asarray(q, dtype=np.float64)
+    norm = np.linalg.norm(q)
+
+    if norm < 1e-12:
+        raise ValueError("Invalid zero-length quaternion")
+
     # Normalize the quaternion
-    x, y, z, w = np.asarray(q, dtype=np.float64) / np.linalg.norm(q)
+    x, y, z, w = q / norm
 
     # Return a 3x3 rotation matrix
     return np.array([
@@ -129,23 +131,3 @@ def relative_pose(a: Image, b: Image) -> tuple[np.ndarray, np.ndarray]:
     p_B_A = a.R.T @ (b.t - a.t)
 
     return R_B_A, p_B_A
-
-
-def _read_rows(path: Path) -> list[list[str]]:
-
-    # Reads and returns rows of the datafile
-    # Ignores commented out lines
-    # Each row is a list of strings, split by whitespace
-    with open(path) as f:
-        return [line.split() for line in f if line.strip() and not line.startswith("#")]
-
-
-def _load_rgb_index(path: Path) -> list[tuple[float, str]]:
-    
-    return sorted((float(ts), name) for ts, name in _read_rows(path))
-
-
-def _load_groundtruth(path: Path) -> np.ndarray:
-    """groundtruth.txt rows "ts tx ty tz qx qy qz qw" -> (N, 8) array sorted by time."""
-    gt = np.array(_read_rows(path), dtype=np.float64)
-    return gt[np.argsort(gt[:, 0])]
