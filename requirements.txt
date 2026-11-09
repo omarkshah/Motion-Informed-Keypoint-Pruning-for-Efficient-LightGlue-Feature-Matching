@@ -1,2 +1,5 @@
 numpy
 opencv-python
+torch
+kornia
+lightglue @ git+https://github.com/cvg/LightGlue.git

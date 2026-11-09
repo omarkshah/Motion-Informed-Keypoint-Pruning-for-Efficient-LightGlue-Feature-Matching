@@ -16,7 +16,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from tum_associate import read_file_list, associate
+from src.tum_associate import read_file_list, associate
 
 
 @dataclass
