@@ -36,7 +36,7 @@ class SuperPointExtractor:
         features = rbd(raw_superpoint)
         w, h = features["image_size"].tolist()
 
-        feature_keypoints = FeatureKeypoints(features["keypoints"].cpu().numpy(), features["scores"].cpu().numpy(), features["descriptors"].cpu().numpy(), (w,h))
+        feature_keypoints = FeatureKeypoints(features["keypoints"].cpu().numpy(), features["keypoint_scores"].cpu().numpy(), features["descriptors"].cpu().numpy(), (w,h))
 
         return feature_keypoints
 
