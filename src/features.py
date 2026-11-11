@@ -2,7 +2,9 @@ import numpy as np
 import torch
 from lightglue import SuperPoint
 from lightglue.utils import rbd
+from dataclasses import dataclass
 
+@dataclass
 class FeatureKeypoints:
     keypoints: np.ndarray # Nx2 array of keypoint coordinates
     scores: np.ndarray # N array of confidence scores for the keypoints
