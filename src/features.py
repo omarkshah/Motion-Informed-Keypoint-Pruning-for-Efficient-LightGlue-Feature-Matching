@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from lightglue import SuperPoint
+from lightglue import SuperPoint, LightGlue
 from lightglue.utils import rbd
 from dataclasses import dataclass
 
