@@ -1,3 +1,5 @@
+/venv/
 /kp-prune-lightglue
 /lightglue-eval
 /data/kitti
+__pycache__/
