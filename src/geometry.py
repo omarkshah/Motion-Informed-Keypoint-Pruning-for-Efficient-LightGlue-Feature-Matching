@@ -23,4 +23,7 @@ class ViewReprojection:
 
 
 
-
+def reproject_kepoints(keypoints, depths, src_intrinsics, dest_intrinsics, R, t, margin):
+    """
+    Go throuhg all the keypoints and determine which ones are visible in the target imnage
+    """
