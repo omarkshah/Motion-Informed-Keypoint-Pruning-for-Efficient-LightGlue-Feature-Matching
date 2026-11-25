@@ -16,6 +16,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from camera import Intrinsics, ROS_DEFAULT
 from tum_associate import read_file_list, associate
 
 # 16 bit depth values
@@ -93,16 +94,17 @@ class Image:
 
 
 class ImageSequence:
-    """A TUM RGB-D sequence: every RGB frame that has a ground-truth pose.
+    """A TUM RGB-D sequence containing RGB frames, registered depth maps, and ground-truth camera poses.
 
     Args:
-        root: dataset directory containing rgb.txt and groundtruth.txt.
-        max_dt: max time gap (s) between an RGB frame and a ground-truth sample;
-            frames with no ground truth this close are dropped.
+        root: Dataset directory containing rgb.txt, depth.txt and groundtruth.txt.
+        max_dt: Maximum allowed timestamp difference between RGB, depth and ground-truth samples.
+        intrinsics: Camera calibration parameters. Defaults to ROS_DEFAULT for registered TUM RGB-D images.
     """
 
-    def __init__(self, root: str | Path, max_dt: float = 0.02):
+    def __init__(self, root: str | Path, max_dt: float = 0.02, intrinsics: Intrinsics = ROS_DEFAULT):
         self.root = Path(root)
+        self.intrinsics = intrinsics
 
         if max_dt <= 0:
             raise ValueError("max_dt must be positive")
