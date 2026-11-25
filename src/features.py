@@ -63,7 +63,7 @@ class LightGlueMatcher:
                     width_confidence = 0.99,
                     filter_threshold = 0.1,
                     device = None):
-        self.device = torch.device(device) if device is not None else default_device()
+        self.device = torch.device(device) if device is not None else get_device()
         
         self.model = LightGlue(
             features=features,
@@ -74,13 +74,13 @@ class LightGlueMatcher:
             filter_threshold=filter_threshold,
         ).eval().to(self.device)
 
-    def match_features(self, f0: Features, f1: Features) -> Matches:
+    def match_features(self, f0, f1):
         out = rbd(self.model({"image0": f0.raw_superpoint, "image1": f1.raw_superpoint}))
     
         idx = out["matches"].cpu().numpy().astype(np.int64)
         stop = out.get("stop", -1)
 
-        return Matches(
+        return FeatureMatches(
             kpts0=f0.keypoints[idx[:, 0]],
             kpts1=f1.keypoints[idx[:, 1]],
             scores=out["scores"].cpu().numpy(),
