@@ -181,4 +181,3 @@ def reproject_keypoints(
         in_image=in_image,
         within_margin=within_margin,
     )
-
