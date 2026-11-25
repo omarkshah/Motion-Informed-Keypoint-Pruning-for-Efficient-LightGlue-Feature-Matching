@@ -55,7 +55,7 @@ class SuperPointExtractor:
 
         return feature_keypoints
 
-class LightGlue:
+class LightGlueMatcher:
     def __init__(self, features = "superpoint",
                     input_dim = 256,
                     descriptor_dim = 256,
