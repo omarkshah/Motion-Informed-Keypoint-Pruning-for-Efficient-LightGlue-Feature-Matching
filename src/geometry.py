@@ -20,7 +20,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from camera import Intrinsics
-
+from frame import Image
 
 @dataclass
 class ViewReprojection:
@@ -92,14 +92,36 @@ def backproject_keypoints(keypoints: np.ndarray, depths: np.ndarray, intrinsics:
     # in metres, in source-camera coordinates
     return points
 
-def transform_points(points: np.ndarray, R: np.ndarray, t: np.ndarray) -> np.ndarray:
+def relative_transform(src_image, dest_image):
+    """ Compute the relative transform (R, t) from the source camera (A) to the destination camera (B)"""
+
+    R_WA = src_image.R # Rotation from to the world frame from the source camera frame
+    t_A = src_image.t  # Translation from the world origin to the source camera position
+
+    R_WB = dest_image.R # Rotation from to the world frame from the dest camera frame
+    t_B = dest_image.t  # Translation from the world origin to the dest camera position
+
+    if R_WA.shape != (3,3) or R_WB.shape != (3,3):
+        raise ValueError("Expected camera rotations of shape (3, 3)")
+    if t_A.shape != (3,) or t_B.shape != (3,):
+        raise ValueError("Expected camera translations of shape (3,)")
+
+    # relative rotation from source to destination
+    R_BA = R_WB.T @ R_WA
+
+    # relation translation from source to destination in the destination camera (B) reference frame
+    t_BA = R_WB.T @ (t_A - t_B)
+
+    return R_BA, t_BA
+
+def transform_points(points: np.ndarray, R_BA: np.ndarray, t_BA: np.ndarray) -> np.ndarray:
     """Transform points from source to target camera coordinates."""
 
     points = np.asarray(points, dtype=np.float64)
-    R = np.asarray(R, dtype=np.float64)
-    t = np.asarray(t, dtype=np.float64)
+    R_BA = np.asarray(R_BA, dtype=np.float64)
+    t_BA = np.asarray(t_BA, dtype=np.float64)
 
-    return points @ R.T + t
+    return points @ R_BA.T + t_BA
 
 def project_points(points: np.ndarray, intrinsics: Intrinsics, eps: float = 1e-6) -> np.ndarray:
     """Project target-camera 3D points into target-image pixels. 
@@ -124,8 +146,8 @@ def reproject_keypoints(
     depths: np.ndarray,
     src_intrinsics: Intrinsics,
     dest_intrinsics: Intrinsics,
-    R: np.ndarray,
-    t: np.ndarray,
+    src_image: Image,
+    dest_image: Image,
     target_size: tuple[int, int],
     margin: float = 20.0,
     eps: float = 1e-6,
@@ -143,12 +165,15 @@ def reproject_keypoints(
     if width <= 0 or height <= 0:
         raise ValueError("Invalid target image size")
 
-    # source pixels -> source-camera 3D points
+    # Compute the relative transform from the source camera (A) to teh destination camera (B)
+    R_BA, t_BA = relative_transform(src_image, dest_image)
+
+    # 3D point in the src camera's coordinate frame
     points_src = backproject_keypoints(keypoints, depths, src_intrinsics)
     has_depth = np.isfinite(points_src).all(axis=1)
 
-    # source-camera -> target-camera coordinates
-    points_dest = transform_points(points_src, R, t)
+    # 3D point in the target camera's coordinate frame
+    points_dest = transform_points(points_src, R_BA, t_BA)
 
     target_depths = points_dest[:, 2]
     finite = np.isfinite(points_dest).all(axis=1)
@@ -158,6 +183,7 @@ def reproject_keypoints(
     behind = finite & (target_depths < -eps)
 
     # target-camera 3D points -> target pixels
+    # projecting the 3D point into the target camera's image plane
     pixels = project_points(points_dest, dest_intrinsics, eps)
     u = pixels[:, 0]
     v = pixels[:, 1]

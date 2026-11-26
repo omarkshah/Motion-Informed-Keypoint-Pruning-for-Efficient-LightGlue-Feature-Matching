@@ -181,14 +181,3 @@ def quaternion_to_matrix(q: np.ndarray) -> np.ndarray:
         [2 * (x * z - y * w),     2 * (y * z + x * w),     1 - 2 * (x**2 + y**2)],
     ])
 
-
-def relative_pose(a: Image, b: Image) -> tuple[np.ndarray, np.ndarray]:
-
-    # rotation from camera b to camera a
-    R_B_A = a.R.T @ b.R
-
-
-    # position of camera b relative to camera a, in camera a's reference frame
-    p_B_A = a.R.T @ (b.t - a.t)
-
-    return R_B_A, p_B_A
