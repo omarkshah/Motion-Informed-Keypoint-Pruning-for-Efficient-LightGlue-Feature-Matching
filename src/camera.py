@@ -1,15 +1,3 @@
-"""Camera intrinsics for the TUM RGB-D sequences.
-
-Usage:
-    from camera import ROS_DEFAULT, FR1_RGB
-
-    # Registered RGB-D geometry
-    ROS_DEFAULT.K
-
-    # Optional distortion-aware RGB geometry
-    FR1_RGB.K
-    FR1_RGB.undistort_points(pixels)
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -67,7 +55,6 @@ FR1_RGB = Intrinsics(
     fx=517.3, fy=516.5, cx=318.6, cy=255.3,
     distortions=(0.2624, -0.9531, -0.0054, 0.0026, 1.1633),
 )
-
 
 # TUM's recommended intrinsics for the pre-registered depth images (and the colour image they line up with)
 ROS_DEFAULT = Intrinsics(fx=525.0, fy=525.0, cx=319.5, cy=239.5)
