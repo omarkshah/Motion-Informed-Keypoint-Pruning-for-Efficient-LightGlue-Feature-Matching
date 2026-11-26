@@ -95,11 +95,11 @@ def backproject_keypoints(keypoints: np.ndarray, depths: np.ndarray, intrinsics:
 def relative_transform(src_image, dest_image):
     """ Compute the relative transform (R, t) from the source camera (A) to the destination camera (B)"""
 
-    R_WA = src_image.R # Rotation from to the world frame from the source camera frame
-    t_A = src_image.t  # Translation from the world origin to the source camera position
+    R_WA = src_image.R # Rotation to the world frame from the source camera frame
+    t_A = src_image.t  # Position of the source camera relative to the world origin
 
-    R_WB = dest_image.R # Rotation from to the world frame from the dest camera frame
-    t_B = dest_image.t  # Translation from the world origin to the dest camera position
+    R_WB = dest_image.R # Rotation to the world frame from the dest camera frame
+    t_B = dest_image.t  # Position of the dest camera relative to the world origin
 
     if R_WA.shape != (3,3) or R_WB.shape != (3,3):
         raise ValueError("Expected camera rotations of shape (3, 3)")
