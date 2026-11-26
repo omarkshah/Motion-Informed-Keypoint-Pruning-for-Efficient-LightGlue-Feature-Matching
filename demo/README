@@ -1,0 +1,59 @@
+# Motion-Informed Keypoint Pruning Demo
+
+This demo demonstrates thow the pruning can be used before LightGlue feature matching. SuperPoint extracts features from two TUM RGB-D frames the motion pruner removes kepoints predicted to be outside the outher camera's view and LightGlue matches the remaining features.
+
+## Running the Demo
+
+Make sure the project dependencies are installed and the virtual environment activated. Dependencies can be installed using `pip install -r requirements.txt` after the venv is activated.
+
+Ensure the `rgbd_dataset_freiburg1_xyz` dataset extracted and available in the project root. It should already be given as part of this project GitHub but can be alternatively found at the following link: https://cvg.cit.tum.de/data/datasets/rgbd-dataset/download
+
+Once venv activated and dependecies installed from the **project root** run:
+
+``` bash
+python demo/demo.py
+```
+
+The demo always defaults to specific frames 100 and 200 as the pair to use for feature matching.
+
+## Command-Line Options
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--seq` | `rgbd_dataset_freiburg1_xyz` | Path to the TUM RGB-D dataset directory. |
+| `--idx` | `100` | Index of the first frame. |
+| `--gap` | `100` | Difference between the first and second frame indices. |
+| `--margin` | `20.0` | Extra pixel margin around the target image before a keypoint is pruned. A smaller margin makes pruning more aggressive. |
+| `--max-kp` | `2048` | Maximum number of SuperPoint keypoints per image. |
+| `--max-lines` | `150` | Maximum number of match lines drawn in the visualization. This does not limit the actual matching process. |
+| `--device` | Automatic | Use `cpu` or `cuda`. By default, CUDA is used if available; otherwise, the CPU is used. |
+
+Examples:
+
+``` bash
+# Selecting different frames
+python demo/demo.py --idx 100 --gap 150
+
+# Use a smaller pruning margin
+python demo/demo.py --margin 5
+
+# List all options
+python demo/demo.py --help
+
+```
+
+## Results
+
+The demo visualizes the prunign decisions for both input images and the final LightGlue correspondences using the retained features
+
+### Pruning Decision
+Found at the top of the visualization is an image pair showing the keypoints found on each of them respectively. These keypoints are colour coded based on the pruning decision made on them:
+- Green --> Retained keypoints with a known projection
+- Red --> Keypoints pruned because they are predicted to be out of view of the second camera
+- Yellow --> Keypoints without a valid depth. These are retained because their visibility cannot be determined reliabily.
+- Orange --> Other uncertain projections that are also retained
+
+### Matching
+
+Underneath the keypoint view is the final matching created based on the pruning. The visualization shows lines connecting corresponding keypoints in the two images. For readability on the highest-confidence matches are drawn (set by `--max-lines`).
+
