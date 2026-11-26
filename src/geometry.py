@@ -1,18 +1,3 @@
-"""Geometric reprojection between two camera views.
-
-Coordinate convention:
-    +X: right
-    +Y: down
-    +Z: forward
-
-All 3D points and translations are expressed in metres. All 2D coordinates are expressed in pixels.
-
-R and t transform source-camera coordinates into target-camera coordinates:
-    P_target = R @ P_source + t
-
-This module assumes an ideal pinhole camera model without lens distortion (e.g. ROS_DEFAULT).
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -110,7 +95,7 @@ def relative_transform(src_image, dest_image):
     R_BA = R_WB.T @ R_WA
 
     # relation translation from source to destination in the destination camera (B) reference frame
-    t_BA = R_WB.T @ (t_A - t_B)
+    t_BA = R_WB.T @ (t_B - t_A)
 
     return R_BA, t_BA
 
@@ -121,7 +106,7 @@ def transform_points(points: np.ndarray, R_BA: np.ndarray, t_BA: np.ndarray) -> 
     R_BA = np.asarray(R_BA, dtype=np.float64)
     t_BA = np.asarray(t_BA, dtype=np.float64)
 
-    return points @ R_BA.T + t_BA
+    return points @ R_BA.T - t_BA
 
 def project_points(points: np.ndarray, intrinsics: Intrinsics, eps: float = 1e-6) -> np.ndarray:
     """Project target-camera 3D points into target-image pixels. 
