@@ -1,4 +1,5 @@
 /venv/
+/.venv/
 /kp-prune-lightglue
 /lightglue-eval
 /data/kitti
