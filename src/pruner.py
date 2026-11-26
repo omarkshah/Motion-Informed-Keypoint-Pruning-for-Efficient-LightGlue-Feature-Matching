@@ -12,7 +12,7 @@ from camera import Intrinsics, ROS_DEFAULT
 class PruningResult:
 
     keep_mask: np.ndarray
-    reprojection: np.ndarray
+    reprojection: ViewReprojection
     features: FeatureKeypoints
 
     @property
@@ -36,7 +36,7 @@ class PruningResult:
         return len(self.pruned_indices)
 
 class MotionPruner:
-    """Prune keypoitns prediceted to be outside the other camera's view"""
+    """Prune keypoints prediceted to be outside the other camera's view"""
 
     def __init__(self, margin = 0, eps = 1e-6):
 
