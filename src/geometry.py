@@ -182,7 +182,6 @@ def reproject_keypoints(
     in_front = finite & (target_depths > eps)
     behind = finite & (target_depths < -eps)
 
-    # target-camera 3D points -> target pixels
     # projecting the 3D point into the target camera's image plane
     pixels = project_points(points_dest, dest_intrinsics, eps)
     u = pixels[:, 0]
