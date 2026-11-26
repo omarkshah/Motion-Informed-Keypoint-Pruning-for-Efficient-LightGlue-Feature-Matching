@@ -23,6 +23,18 @@ class PruningResult:
     def pruned_indices(self):
         return np.flatnonzero(~self.keep_mask)
 
+    @property
+    def n_total(self):
+        return len(self.keep_mask)
+
+    @property
+    def n_kept(self):
+        return len(self.kept_indices)
+
+    @property
+    def n_pruned(self):
+        return len(self.pruned_indices)
+
 class MotionPruner:
     """Prune keypoitns prediceted to be outside the other camera's view"""
 
@@ -59,16 +71,13 @@ class MotionPruner:
             for name in ("keypoints", "descriptors", "keypoint_scores"):
 
                 tensor = raw[name]
-                if tensor.ndim < 2 or tuple(tensor.shape[:2]) != (n,):
+                if tensor.ndim < 2 or tuple(tensor.shape[:2]) != (1, n):
                     raise ValueError(f"Unexpected shape for raw {name}")
 
                 mask = torch.as_tensor(keep_mask, device=tensor.device)
                 filtered_raw[name] = tensor[:, mask]
 
-        return FeatureKeypoints(features.keypoints[keep_mask], features.scores[keep_mask], features.descriptors[keep_mask], filtered_raw)
-
-                
-
+        return FeatureKeypoints(keypoints=features.keypoints[keep_mask], scores=features.scores[keep_mask], descriptors=features.descriptors[keep_mask], image_size=features.image_size, raw_superpoint=filtered_raw)
 
     def prune(self, features : FeatureKeypoints, src_image: Image, dest_image: Image, src_intrinsics: Intrinsics, dest_intrinsics: Intrinsics):
         """Prune keypoints predicted to be outside the other camera's view"""
@@ -105,5 +114,23 @@ class MotionPruner:
         keep_mask = self.compute_keep_mask(projection)
 
         # Return the 
-        return PruningResult(features=self.filter_features(features, keep_mask), keep_mask=keep_mask, reprojection=projection.pixels)
+        return PruningResult(features=self.filter_features(features, keep_mask), keep_mask=keep_mask, reprojection=projection)
 
+    def prune_image_pair(self, f_a: FeatureKeypoints, f_b: FeatureKeypoints, img_a: Image, img_b: Image, intrinsics_a: Intrinsics = None, intrinsics_b: Intrinsics = None):
+        """Prune keypoints predicted to be outside the other camera's view for both images"""
+
+        if intrinsics_a is None:
+            intrinsics_a = ROS_DEFAULT
+        if intrinsics_b is None:
+            intrinsics_b = intrinsics_a
+
+        results_0 = self.prune(f_a, img_a, img_b, intrinsics_a, intrinsics_b) # pruning keypoints in image A based on their predicted visibility in image B
+        results_1 = self.prune(f_b, img_b, img_a, intrinsics_b, intrinsics_a) # pruning keypoints in image B based on their predicted visibility in image A
+
+        return results_0, results_1
+
+def remap_matched_indices(indices, result0, result1):
+
+    indices = np.asarray(indices)
+
+    return np.column_stack((result0.kept_indices[indices[:, 0]], result1.kept_indices[indices[:, 1]]))
