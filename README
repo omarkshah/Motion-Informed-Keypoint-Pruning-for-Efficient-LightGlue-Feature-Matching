@@ -28,3 +28,7 @@ python results/experiment_1_speed.py --motion random --gaps 10 50 100 200 --pair
 ```
 
 All commands should be ran from the project root. Generated visualization, statistics and plots are saved in the `results/` folder.
+
+## Results
+
+Existing results can be found in the `results/` directory
