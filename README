@@ -1,0 +1,30 @@
+# Motion-Informed Keypoint Pruning for Efficient LightGlue Feature Matchign
+
+## Setup
+
+From the project root, activate your vritual environment and install the dependencies using:
+
+```bash
+pip install -r requirements.txt
+```
+
+Ensure LightGlue is installed and the TUM RGB-D Freiburg1 XYZ dataset is extracted in the project root. The dataset should already be given as part of this project GitHub but can be alternatively found at the following link: https://cvg.cit.tum.de/data/datasets/rgbd-dataset/download
+
+## Running the demo 
+
+```bash
+python demo/demo.py
+```
+
+Visualizes the motion-informed keypoint pruning and the resulting LightGlue matches
+
+## Running the Experiments
+
+As part of this project three experiments were ran. More information on specifs can be found in the experiments folder README.
+
+Or the following command can be ran to have a basic experiment:
+```bash
+python results/experiment_1_speed.py --motion random --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out experiment1/results/random
+```
+
+All commands should be ran from the project root. Generated visualization, statistics and plots are saved in the `results/` folder.

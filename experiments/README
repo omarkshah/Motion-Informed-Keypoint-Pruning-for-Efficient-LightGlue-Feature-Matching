@@ -1,0 +1,41 @@
+# Experiments
+
+These experiments compare standard LightGlue with motion-pruned LightGlue using SuperPoint features and the TUM RGB-D dataset. All of the following commands can be ran from the project root to replicate the experiments. Ensure all required dependencies are installed.
+
+## Experiment 1: Speed
+
+`experiment_1_speed.py` evaluates whether motion pruning reduces feature matching runtime compared ot standard LightGlue
+
+### How to Run
+
+
+Rotation-based sampling: 
+```bash
+python experiments/experiment_1_speed.py --motion rotation --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out results/experiment1/rotation
+```
+
+Random sampling
+```bash
+python experiments/experiment_1_speed.py --motion random --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out results/experiment1/random
+```
+
+Translation-based sampling
+```bash
+python experiments/experiment_1_speed.py --motion translation --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out results/experiment1/translation
+```
+
+Each run samples up to 5 image pairs per frame gap and runs each matching method twice per pair. Rotation and translation sampling select pairs across the range of the corresponding camera motion.
+
+This can be ran with the `--help` flag to see the details of each argument it can take.
+
+
+## Experiment 2: Accuracy (Comparing Match Count)
+
+`experiment_2_accuracy.py` compares the number of matches returned by standard and motion-pruned LightGlue to evalaute whether pruning reduces the number of available matches.
+
+## How to run
+
+```bash
+python experiments/experiment_2_accuracy.py --pairs-per-gap 5
+```
+
