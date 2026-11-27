@@ -1,0 +1,3 @@
+method,n_pairs,pruning_ms_mean,matching_ms_mean,total_ms_mean,pruned_pct_mean,matches_mean,layers_mean
+Standard,20,0.0,698.2051678736752,698.2051678736752,0.0,568.5,6.05
+Motion-pruned,20,2.9965762983920285,647.5727575761994,650.5693338745914,14.077588848496486,563.95,6.35
