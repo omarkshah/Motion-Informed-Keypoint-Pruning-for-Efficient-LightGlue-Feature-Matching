@@ -64,14 +64,12 @@ def run_pipeline(extractor, matcher, pruner, a, b, intrinsics):
 
     device = extractor.device
 
-    start = time.perf_counter()
-
     fa, fb = extractor.extract(a.data), extractor.extract(b.data)
-    after_superpoint = time.perf_counter()
 
+    start = time.perf_counter()
     if pruner is None:
         sa, sb = fa, fb
-        after_pruning = after_superpoint
+        after_pruning = start
     else:
         ra, rb = pruner.prune_image_pair(fa, fb, a, b, intrinsics, intrinsics)
         sa, sb = ra.features, rb.features
@@ -79,8 +77,7 @@ def run_pipeline(extractor, matcher, pruner, a, b, intrinsics):
 
     matches = matcher.match_features(sa, sb)
     end = time.perf_counter()
-    return dict(superpoint_ms=(after_superpoint - start) * 1000.0,
-                pruning_ms=(after_pruning - after_superpoint) * 1000.0,
+    return dict(pruning_ms=(after_pruning - start) * 1000.0,
                 matching_ms=(end - after_pruning) * 1000.0,
                 total_ms=(end - start) * 1000.0,
                 **feature_stats(fa, fb, sa, sb, matches))
@@ -151,7 +148,7 @@ def main():
     pruner = MotionPruner(margin=args.margin)
 
     trials, pair_rows = [], []
-    timings = ["superpoint_ms", "pruning_ms", "matching_ms", "total_ms"]
+    timings = [ "pruning_ms", "matching_ms", "total_ms"]
 
     for p, (i, j) in enumerate(pairs):
         a, b = seq.images[i], seq.images[j]
@@ -189,9 +186,21 @@ def main():
         # compare med and calculate speedup
         base = med["Standard"]
         reduced = med["Motion-pruned"]
-        reduced["speedup"] = base["total_ms"] / reduced["total_ms"]
 
-        print(f"Pair {i} -> {j}: Speedup {reduced['speedup']:.2f}x")
+        reduced["speedup"] = (
+            base["total_ms"] / reduced["total_ms"]
+        )
+
+        reduced["matching_speedup"] = (
+            base["matching_ms"] / reduced["matching_ms"]
+        )
+
+        print(
+            f"Pair {i} -> {j}: "
+            f"Pruned {reduced['pruned_pct']:.1f}% | "
+            f"Matching speedup {reduced['matching_speedup']:.2f}x | "
+            f"Net speedup {reduced['speedup']:.2f}x"
+        )
 
         a.clear_cache()
         b.clear_cache()
@@ -285,16 +294,14 @@ def plot_results(summary_by_gap, overall, out):
     # Plot the average runtime of each pipeline stage
     fig, ax = plt.subplots(figsize=(6, 4))
 
-    superpoint = np.array([r["superpoint_ms_mean"] for r in overall])
     pruning = np.array([r["pruning_ms_mean"] for r in overall])
     matching = np.array([r["matching_ms_mean"] for r in overall])
 
-    ax.bar(methods, superpoint, label="SuperPoint")
-    ax.bar(methods, pruning, bottom=superpoint, label="Motion pruning")
-    ax.bar(methods, matching, bottom=superpoint + pruning, label="LightGlue")
+    ax.bar(methods, pruning, label="Motion pruning")
+    ax.bar(methods, matching, bottom=pruning, label="LightGlue")
 
     ax.set_ylabel("Runtime (ms)")
-    ax.set_title("Pipeline runtime breakdown")
+    ax.set_title("Post-extraction runtime breakdown")
     ax.legend()
 
     fig.tight_layout()
