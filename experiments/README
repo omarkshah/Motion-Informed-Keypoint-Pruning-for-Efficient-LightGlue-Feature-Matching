@@ -11,20 +11,23 @@ These experiments compare standard LightGlue with motion-pruned LightGlue using 
 
 Rotation-based sampling: 
 ```bash
-python results/experiment_1_speed.py --motion rotation --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out experiment1/results/rotation
+python experiments/experiment_1_speed.py --motion rotation --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out results/experiment1/rotation
 ```
 
 Random sampling
 ```bash
-python results/experiment_1_speed.py --motion random --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out experiment1/results/random
+python experiments/experiment_1_speed.py --motion random --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out results/experiment1/random
 ```
 
 Translation-based sampling
 ```bash
-python results/experiment_1_speed.py --motion translation --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out experiment1/results/translation
+python experiments/experiment_1_speed.py --motion translation --gaps 10 50 100 200 --pairs-per-gap 5 --repeats 2 --out results/experiment1/translation
 ```
 
 Each run samples up to 5 image pairs per frame gap and runs each matching method twice per pair. Rotation and translation sampling select pairs across the range of the corresponding camera motion.
+
+This can be ran with the `--help` flag to see the details of each argument it can take.
+
 
 ## Experiment 2: Accuracy (Comparing Match Count)
 
@@ -33,6 +36,6 @@ Each run samples up to 5 image pairs per frame gap and runs each matching method
 ## How to run
 
 ```bash
-python results/experiment_2/experiment_2_accuracy.py --pairs-per-gap 5
+python experiments/experiment_2_accuracy.py --pairs-per-gap 5
 ```
 
